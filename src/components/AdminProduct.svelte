@@ -109,46 +109,47 @@
         }
     };
 </script>
-
 <div class="admin-panel">
     <h1>Admin Panel - Upload Product</h1>
 
-    <div class="input-group">
-        <input type="text" placeholder="Product Name" bind:value={productName} />
-    </div>
-
-    <div class="input-row">
+    <div class="form-section">
         <div class="input-group">
-            <input type="number" placeholder="Price" bind:value={price} />
+            <input type="text" placeholder="Product Name" bind:value={productName} />
         </div>
+
+        <div class="input-row">
+            <div class="input-group">
+                <input type="number" placeholder="Price" bind:value={price} />
+            </div>
+            <div class="input-group">
+                <input type="number" placeholder="Discounted Price" bind:value={discountedPrice} />
+            </div>
+        </div>
+
         <div class="input-group">
-            <input type="number" placeholder="Discounted Price" bind:value={discountedPrice} />
+            <input type="text" placeholder="Category" bind:value={category} />
         </div>
-    </div>
 
-    <div class="input-group">
-        <input type="text" placeholder="Category" bind:value={category} />
-    </div>
-
-    <div class="input-row">
-        <div class="input-group">
-            <input type="number" placeholder="Stock" bind:value={stock} />
+        <div class="input-row">
+            <div class="input-group">
+                <input type="number" placeholder="Stock" bind:value={stock} />
+            </div>
+            <div class="input-group file-input">
+                <input type="file" accept="image/*" on:change={handleImageChange} />
+            </div>
         </div>
-        <div class="input-group">
-            <input type="file" accept="image/*" on:change={handleImageChange} />
+
+        <div class="button-group">
+            {#if editingProductId}
+                <button class="update-btn" on:click={updateProduct}>Update Product</button>
+            {:else}
+                <button class="upload-btn" on:click={uploadProduct}>Upload Product</button>
+            {/if}
         </div>
-    </div>
 
-    <div class="button-group">
-        {#if editingProductId}
-            <button on:click={updateProduct}>Update Product</button>
-        {:else}
-            <button on:click={uploadProduct}>Upload Product</button>
-        {/if}
-    </div>
-
-    <div class="status">
-        <p>{uploadStatus}</p>
+        <div class="status">
+            <p>{uploadStatus}</p>
+        </div>
     </div>
 </div>
 
@@ -169,14 +170,14 @@
         <tbody>
             {#each products as product}
                 <tr>
-                    <td><img src={product.imageUrl} alt={product.productName} style="width: 60px; height: auto;" /></td>
+                    <td><img src={product.imageUrl} alt={product.productName} /></td>
                     <td>{product.productName}</td>
                     <td>Rs. {product.price}</td>
                     <td>Rs. {product.discountedPrice}</td>
                     <td>{product.category}</td>
                     <td>{product.stock}</td>
                     <td>
-                        <button on:click={() => editProduct(product)}>Edit</button>
+                        <button class="edit-btn" on:click={() => editProduct(product)}>Edit</button>
                     </td>
                 </tr>
             {/each}
@@ -184,121 +185,131 @@
     </table>
 </div>
 
-
 <style>
+    /* Updated styling */
     .admin-panel {
-        max-width: 600px;
+        max-width: 700px;
         margin: 3rem auto;
-        padding: 2rem;
-        background-color: #f7f7f7;
-        border-radius: 12px;
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-        font-family: 'Roboto', sans-serif;
-        color: #333;
+        padding: 2.5rem;
+        background: linear-gradient(135deg, #f0f4f8, #dfe9f3);
+        border-radius: 15px;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        font-family: 'Arial', sans-serif;
+        color: #34495e;
     }
 
     h1 {
-        text-align: center;
-        color: #2c3e50;
-        margin-bottom: 2.5rem;
-        font-size: 1.8rem;
-        font-weight: bold;
+        color: #34495e;
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 2rem;
     }
 
-    .input-group {
-        margin-bottom: 1.25rem;
+    .form-section {
+        padding: 0 1.5rem;
+    }
+
+    .input-group, .file-input {
+        margin-bottom: 1.5rem;
     }
 
     .input-row {
         display: flex;
-        justify-content: space-between;
         gap: 1rem;
+        justify-content: space-between;
+        align-items: center;
     }
-    input {
+
+    input[type="text"], input[type="number"], input[type="file"] {
         width: 100%;
-        padding: 0.9rem;
-        font-size: 1rem;
-        border: 1px solid #ddd;
+        padding: 0.8rem;
         border-radius: 8px;
-        box-sizing: border-box;
-        transition: border-color 0.3s ease;
-        background-color: #fff;
-        color: #333;
-    }
-    input:focus {
-        border-color: #2980b9;
-        outline: none;
-        box-shadow: 0 0 8px rgba(41, 128, 185, 0.3);
-    }
-    .button-group {
-        text-align: center;
-    }
-    button {
-        padding: 0.75rem 2.5rem;
-        background-color: #e74c3c;
-        color: #fff;
-        border: none;
-        border-radius: 50px;
-        cursor: pointer;
-        font-size: 1.1rem;
-        font-weight: bold;
-        transition: background-color 0.3s ease, transform 0.2s ease;
-    }
-    button:hover {
-        background-color: #c0392b;
-        transform: scale(1.05);
-    }
-    .status p {
-        text-align: center;
+        border: 1px solid #cdd1d4;
+        background: #fefefe;
+        transition: all 0.3s ease;
         font-size: 1rem;
-        color: green;
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus, input[type="file"]:focus {
+        outline: none;
+        border-color: #3498db;
+        box-shadow: 0 0 8px rgba(52, 152, 219, 0.3);
+    }
+
+    .button-group {
         margin-top: 1.5rem;
     }
 
+    .upload-btn, .update-btn {
+        background-color: #3498db;
+        color: #fff;
+        padding: 0.8rem 2.5rem;
+        font-size: 1.1rem;
+        border: none;
+        border-radius: 30px;
+        cursor: pointer;
+        transition: background 0.3s ease, transform 0.2s;
+    }
+
+    .upload-btn:hover, .update-btn:hover {
+        background-color: #2980b9;
+        transform: translateY(-2px);
+    }
+
+    .status p {
+        font-size: 1rem;
+        color: green;
+        margin-top: 1.2rem;
+    }
+
     .product-list {
-        max-width: 1000px;
-        margin: 2rem auto;
+        max-width: 900px;
+        margin: 2.5rem auto;
     }
 
     table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 1rem;
-        font-family: 'Roboto', sans-serif;
+        font-family: 'Arial', sans-serif;
     }
 
     th, td {
-        padding: 0.75rem 1rem;
+        padding: 0.75rem;
         text-align: left;
         border: 1px solid #ddd;
+        font-size: 0.9rem;
     }
 
     th {
-        background-color: #2980b9;
-        color: white;
+        background-color: #3498db;
+        color: #fff;
+        text-transform: uppercase;
+    }
+
+    tr:nth-child(even) {
+        background-color: #f9f9f9;
     }
 
     img {
-        max-width: 100%;
-        height: auto;
-        border-radius: 4px;
-    }
-
-    td img {
+        width: 50px;
+        height: 50px;
+        border-radius: 8px;
         display: block;
         margin: 0 auto;
     }
 
-    td button {
-        background-color: #3498db;
-        color: #fff;
-        padding: 0.5rem 1rem;
-        border-radius: 4px;
+    .edit-btn {
+        background-color: #e67e22;
+        color: white;
         border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
         cursor: pointer;
+        transition: background 0.3s ease;
     }
 
-    td button:hover {
-        background-color: #2980b9;
+    .edit-btn:hover {
+        background-color: #d35400;
     }
 </style>
