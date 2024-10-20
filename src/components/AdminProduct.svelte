@@ -1,6 +1,14 @@
 <script>
     import { onMount } from "svelte";
-    import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc } from "firebase/firestore";
+    import {
+        collection,
+        addDoc,
+        getDocs,
+        updateDoc,
+        doc,
+        getDoc,
+        deleteDoc,
+    } from "firebase/firestore";
     import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
     import { db, storage } from "$lib/firebaseConfig";
 
@@ -12,17 +20,56 @@
     let stock = "";
     let uploadStatus = "";
     let products = [];
+    let featuredProducts = [];
+    let dailyEssentialProducts = [];
     let editingProductId = null;
     let isEditing = false;
     let currentImageUrl = "";
 
     onMount(async () => {
         await fetchProducts();
+        await fetchFeaturedProducts();
+        await fetchDailyEssentialProducts();
     });
 
     const fetchProducts = async () => {
         const querySnapshot = await getDocs(collection(db, "products"));
-        products = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        products = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
+    };
+
+    const fetchFeaturedProducts = async () => {
+        const featuredSnapshot = await getDocs(
+            collection(db, "featuredProducts"),
+        );
+        const featuredIds = featuredSnapshot.docs.map(
+            (doc) => doc.data().productId,
+        );
+
+        featuredProducts = await Promise.all(
+            featuredIds.map(async (id) => {
+                const productDoc = await getDoc(doc(db, "products", id));
+                return { id, ...productDoc.data() };
+            }),
+        );
+    };
+
+    const fetchDailyEssentialProducts = async () => {
+        const dailyEssentialsSnapshot = await getDocs(
+            collection(db, "dailyEssentials"),
+        );
+        const dailyEssentialIds = dailyEssentialsSnapshot.docs.map(
+            (doc) => doc.data().productId,
+        );
+
+        dailyEssentialProducts = await Promise.all(
+            dailyEssentialIds.map(async (id) => {
+                const productDoc = await getDoc(doc(db, "products", id));
+                return { id, ...productDoc.data() };
+            }),
+        );
     };
 
     const handleImageChange = (e) => {
@@ -30,7 +77,13 @@
     };
 
     const uploadProduct = async () => {
-        if (!productName || !price || !category || !stock || (!imageFile && !isEditing)) {
+        if (
+            !productName ||
+            !price ||
+            !category ||
+            !stock ||
+            (!imageFile && !isEditing)
+        ) {
             uploadStatus = "Please fill all fields and select an image.";
             return;
         }
@@ -38,7 +91,6 @@
         try {
             let imageUrl = currentImageUrl;
 
-            // Upload a new image if a new file is selected
             if (imageFile) {
                 const storageRef = ref(storage, `products/${imageFile.name}`);
                 await uploadBytes(storageRef, imageFile);
@@ -46,7 +98,6 @@
             }
 
             if (isEditing) {
-                // Update the existing product
                 const productRef = doc(db, "products", editingProductId);
                 await updateDoc(productRef, {
                     productName,
@@ -54,11 +105,10 @@
                     discountedPrice: Number(discountedPrice),
                     category,
                     stock: Number(stock),
-                    imageUrl
+                    imageUrl,
                 });
                 uploadStatus = "Product updated successfully!";
             } else {
-                // Add a new product
                 await addDoc(collection(db, "products"), {
                     productName,
                     price: Number(price),
@@ -66,14 +116,14 @@
                     category,
                     stock: Number(stock),
                     imageUrl,
-                    featured: false,
-                    dailyEssential: false
                 });
                 uploadStatus = "Product uploaded successfully!";
             }
 
             resetForm();
             await fetchProducts();
+            await fetchFeaturedProducts();
+            await fetchDailyEssentialProducts();
         } catch (error) {
             uploadStatus = "Failed to upload product: " + error.message;
         }
@@ -103,31 +153,85 @@
         isEditing = false;
     };
 
-    const toggleFeatured = async (product) => {
-        const productRef = doc(db, "products", product.id);
-        await updateDoc(productRef, { featured: !product.featured });
-        await fetchProducts();
+    const addToFeatured = async (productId) => {
+        try {
+            await addDoc(collection(db, "featuredProducts"), { productId });
+            await fetchFeaturedProducts();
+        } catch (error) {
+            console.error("Failed to add to featured products:", error);
+        }
     };
 
-    const toggleDailyEssential = async (product) => {
-        const productRef = doc(db, "products", product.id);
-        await updateDoc(productRef, { dailyEssential: !product.dailyEssential });
-        await fetchProducts();
+    const removeFromFeatured = async (productId) => {
+        try {
+            const featuredSnapshot = await getDocs(
+                collection(db, "featuredProducts"),
+            );
+            const docToDelete = featuredSnapshot.docs.find(
+                (doc) => doc.data().productId === productId,
+            );
+            if (docToDelete) {
+                await deleteDoc(doc(db, "featuredProducts", docToDelete.id));
+                await fetchFeaturedProducts();
+            }
+        } catch (error) {
+            console.error("Failed to remove from featured products:", error);
+        }
     };
 
-    // Separate arrays for featured and daily essential products
-    $: featuredProducts = products.filter(product => product.featured);
-    $: dailyEssentials = products.filter(product => product.dailyEssential);
+    const isProductFeatured = (productId) => {
+        return featuredProducts.some((product) => product.id === productId);
+    };
+
+    const addToDailyEssentials = async (productId) => {
+        try {
+            await addDoc(collection(db, "dailyEssentials"), { productId });
+            await fetchDailyEssentialProducts();
+        } catch (error) {
+            console.error("Failed to add to daily essentials:", error);
+        }
+    };
+
+    const removeFromDailyEssentials = async (productId) => {
+        try {
+            const dailyEssentialsSnapshot = await getDocs(
+                collection(db, "dailyEssentials"),
+            );
+            const docToDelete = dailyEssentialsSnapshot.docs.find(
+                (doc) => doc.data().productId === productId,
+            );
+            if (docToDelete) {
+                await deleteDoc(doc(db, "dailyEssentials", docToDelete.id));
+                await fetchDailyEssentialProducts();
+            }
+        } catch (error) {
+            console.error("Failed to remove from daily essentials:", error);
+        }
+    };
+
+    const isProductInDailyEssentials = (productId) => {
+        return dailyEssentialProducts.some(
+            (product) => product.id === productId,
+        );
+    };
 </script>
 
 <div class="admin-panel">
-    <h1>{isEditing ? 'Edit Product' : 'Upload Product'}</h1>
+    <h1>{isEditing ? "Edit Product" : "Upload Product"}</h1>
     <div class="form">
-        <input type="text" bind:value={productName} placeholder="Product Name" />
-        <input type="text" bind:value={price} placeholder="Price" />
-        <input type="text" bind:value={discountedPrice} placeholder="Discounted Price" />
+        <input
+            type="text"
+            bind:value={productName}
+            placeholder="Product Name"
+        />
+        <input type="number" bind:value={price} placeholder="Price" />
+        <input
+            type="number"
+            bind:value={discountedPrice}
+            placeholder="Discounted Price"
+        />
         <input type="text" bind:value={category} placeholder="Category" />
-        <input type="text" bind:value={stock} placeholder="Stock" />
+        <input type="number" bind:value={stock} placeholder="Stock" />
         <input type="file" on:change={handleImageChange} />
         {#if currentImageUrl}
             <div class="current-image">
@@ -135,7 +239,9 @@
                 <img src={currentImageUrl} alt="Current product image" />
             </div>
         {/if}
-        <button on:click={uploadProduct}>{isEditing ? 'Update Product' : 'Upload Product'}</button>
+        <button on:click={uploadProduct}
+            >{isEditing ? "Update Product" : "Upload Product"}</button
+        >
         <p>{uploadStatus}</p>
     </div>
 
@@ -156,20 +262,37 @@
             <tbody>
                 {#each products as product}
                     <tr>
-                        <td><img src={product.imageUrl} alt={product.productName} /></td>
+                        <td
+                            ><img
+                                src={product.imageUrl}
+                                alt={product.productName}
+                            /></td
+                        >
                         <td>{product.productName}</td>
                         <td>Rs. {product.price}</td>
                         <td>Rs. {product.discountedPrice}</td>
                         <td>{product.category}</td>
                         <td>{product.stock}</td>
                         <td>
-                            <button class="edit-btn" on:click={() => editProduct(product)}>Edit</button>
-                            <button class="toggle-btn" on:click={() => toggleFeatured(product)}>
-                                {product.featured ? 'Remove from Featured' : 'Add to Featured'}
-                            </button>
-                            <button class="toggle-btn" on:click={() => toggleDailyEssential(product)}>
-                                {product.dailyEssential ? 'Remove from Daily Essentials' : 'Add to Daily Essentials'}
-                            </button>
+                            <button
+                                class="edit-btn"
+                                on:click={() => editProduct(product)}
+                                >Edit</button
+                            >
+                            <button
+                                class="edit-btn"
+                                on:click={() => addToFeatured(product.id)}
+                                disabled={isProductFeatured(product.id)}
+                                >Add to Featured</button
+                            >
+                            <button
+                                class="edit-btn"
+                                on:click={() =>
+                                    addToDailyEssentials(product.id)}
+                                disabled={isProductInDailyEssentials(
+                                    product.id,
+                                )}>Add to Daily Essentials</button
+                            >
                         </td>
                     </tr>
                 {/each}
@@ -177,8 +300,8 @@
         </table>
     </div>
 
-    <div class="featured-products">
-        <h2>Featured Products</h2>
+    <div class="featured-product-list">
+        <h2>Featured Products List</h2>
         <table>
             <thead>
                 <tr>
@@ -194,17 +317,28 @@
             <tbody>
                 {#each featuredProducts as product}
                     <tr>
-                        <td><img src={product.imageUrl} alt={product.productName} /></td>
+                        <td
+                            ><img
+                                src={product.imageUrl}
+                                alt={product.productName}
+                            /></td
+                        >
                         <td>{product.productName}</td>
                         <td>Rs. {product.price}</td>
                         <td>Rs. {product.discountedPrice}</td>
                         <td>{product.category}</td>
                         <td>{product.stock}</td>
                         <td>
-                            <button class="edit-btn" on:click={() => editProduct(product)}>Edit</button>
-                            <button class="toggle-btn" on:click={() => toggleFeatured(product)}>
-                                Remove
-                            </button>
+                            <button
+                                class="edit-btn"
+                                on:click={() => editProduct(product)}
+                                >Edit</button
+                            >
+                            <button
+                                class="edit-btn"
+                                on:click={() => removeFromFeatured(product.id)}
+                                >Remove</button
+                            >
                         </td>
                     </tr>
                 {/each}
@@ -212,8 +346,8 @@
         </table>
     </div>
 
-    <div class="daily-essentials">
-        <h2>Daily Essentials</h2>
+    <div class="daily-essential-list">
+        <h2>Daily Essentials List</h2>
         <table>
             <thead>
                 <tr>
@@ -227,19 +361,31 @@
                 </tr>
             </thead>
             <tbody>
-                {#each dailyEssentials as product}
+                {#each dailyEssentialProducts as product}
                     <tr>
-                        <td><img src={product.imageUrl} alt={product.productName} /></td>
+                        <td
+                            ><img
+                                src={product.imageUrl}
+                                alt={product.productName}
+                            /></td
+                        >
                         <td>{product.productName}</td>
                         <td>Rs. {product.price}</td>
                         <td>Rs. {product.discountedPrice}</td>
                         <td>{product.category}</td>
                         <td>{product.stock}</td>
                         <td>
-                            <button class="edit-btn" on:click={() => editProduct(product)}>Edit</button>
-                            <button class="toggle-btn" on:click={() => toggleDailyEssential(product)}>
-                                Remove
-                            </button>
+                            <button
+                                class="edit-btn"
+                                on:click={() => editProduct(product)}
+                                >Edit</button
+                            >
+                            <button
+                                class="edit-btn"
+                                on:click={() =>
+                                    removeFromDailyEssentials(product.id)}
+                                >Remove</button
+                            >
                         </td>
                     </tr>
                 {/each}
@@ -250,98 +396,102 @@
 
 <style>
     .admin-panel {
-        max-width: 1200px;
+        max-width: 800px;
         margin: 0 auto;
         padding: 20px;
+        background-color: #f2f2f2; /* Lighter background color */
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
 
-    h1, h2 {
+    h1,
+    h2 {
         text-align: center;
+        font-size: 24px;
+        margin-bottom: 15px; /* Reduced margin */
+        color: #333;
     }
 
     .form {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        max-width: 400px;
-        margin: 0 auto 20px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px; /* Reduced gap */
+        margin-bottom: 20px; /* Reduced margin */
     }
 
-    input[type="text"], input[type="file"], button {
-        padding: 10px;
-        font-size: 16px
+    input[type="text"],
+    input[type="number"],
+    input[type="file"] {
+        padding: 8px; /* Reduced padding */
+        font-size: 14px; /* Smaller font size */
+        border: 1px solid #ccc;
+        border-radius: 4px;
     }
 
-button {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-weight: bold;
-}
+    button {
+        padding: 10px; /* Adjusted padding */
+        font-size: 14px; /* Smaller font size */
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        width: 100%; /* Full width */
+        margin-top: 10px; /* Added margin for spacing */
+    }
 
-button:hover {
-    background-color: #45a049;
-}
+    button[disabled] {
+        background-color: #999;
+    }
 
-.product-list,
-.featured-products,
-.daily-essentials {
-    margin-top: 30px;
-}
+    .product-list,
+    .featured-product-list {
+        margin-top: 30px; /* Reduced margin */
+    }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 15px; /* Reduced margin */
+    }
 
-table, th, td {
-    border: 1px solid #ddd;
-}
+    th,
+    td {
+        border: 1px solid #ddd;
+        padding: 8px; /* Reduced padding */
+        text-align: left;
+        font-size: 14px; /* Smaller font size */
+    }
 
-th, td {
-    padding: 10px;
-    text-align: left;
-}
+    img {
+        width: 50px; /* Smaller image size */
+        height: 50px; /* Smaller image size */
+        object-fit: cover;
+    }
 
-th {
-    background-color: #f2f2f2;
-}
+    .edit-btn,
+    .add-btn,
+    .remove-btn {
+        background-color: #2196f3; /* Blue background for edit and add buttons */
+        color: white;
+        padding: 6px 12px; /* Adjusted padding */
+        font-size: 12px; /* Smaller font size */
+        border: none; /* Removed border */
+        border-radius: 4px; /* Rounded corners */
+        cursor: pointer;
+        margin: 5px; /* Added margin for spacing */
+    }
 
-.edit-btn, .toggle-btn {
-    padding: 5px 10px;
-    cursor: pointer;
-    background-color: #2196F3;
-    color: white;
-    border: none;
-    margin: 2px;
-}
+    .add-btn {
+        background-color: #4caf50; /* Green background for add button */
+    }
 
-.toggle-btn {
-    background-color: #f39c12;
-}
+    .remove-btn {
+        background-color: #f44336; /* Red background for remove button */
+    }
 
-.edit-btn:hover, .toggle-btn:hover {
-    opacity: 0.8;
-}
-
-img {
-    max-width: 100px;
-    max-height: 100px;
-}
-
-.current-image {
-    text-align: center;
-}
-
-.current-image img {
-    max-width: 150px;
-    max-height: 150px;
-    margin-top: 10px;
-}
-
-p {
-    color: #4CAF50;
-    text-align: center;
-}
+    .current-image img {
+        max-width: 80px; /* Adjusted max-width */
+        margin-top: 10px;
+    }
 </style>

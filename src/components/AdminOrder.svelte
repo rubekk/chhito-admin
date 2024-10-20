@@ -37,34 +37,42 @@
     }
   }
 
-  // Mark order as delivered
-  async function markAsDelivered(orderId) {
+  // Update order status
+  async function updateOrderStatus(orderId, status) {
     try {
       const orderDocRef = doc(db, "orders", orderId);
       await updateDoc(orderDocRef, {
-        status: "delivered"
+        status: status
       });
       fetchOrders();
-      alert("Order marked as delivered!");
+      alert(`Order marked as ${status}!`);
     } catch (error) {
       console.error("Error updating order: ", error);
       alert("Failed to update order status. Please try again.");
     }
   }
 
-  // Mark order as pending
-  async function markAsPending(orderId) {
+  // Update delivery time
+  async function updateDeliveryTime(orderId, newTime) {
     try {
       const orderDocRef = doc(db, "orders", orderId);
       await updateDoc(orderDocRef, {
-        status: "pending"
+        orderDeliveryTime: newTime
       });
       fetchOrders();
-      alert("Order marked as pending!");
+      alert(`Delivery time updated to ${newTime}!`);
     } catch (error) {
-      console.error("Error updating order: ", error);
-      alert("Failed to update order status. Please try again.");
+      console.error("Error updating delivery time: ", error);
+      alert("Failed to update delivery time. Please try again.");
     }
+  }
+
+  // Calculate estimated delivery time
+  function calculateEstimatedDeliveryTime(order) {
+    const orderDate = new Date(`${order.orderDate} ${order.orderTime}`);
+    const deliveryDuration = parseInt(order.orderDeliveryTime) || 0; // Delivery duration in minutes
+    const estimatedDelivery = new Date(orderDate.getTime() + deliveryDuration * 60000); // Adding minutes to order time
+    return estimatedDelivery.toLocaleString(); // Format as needed
   }
 
   onMount(async () => {
@@ -95,13 +103,19 @@
               <span>Order by {order.orderUsername}</span>
           </div>
           <div class="order-info">
-              <div class="order-details">Phone: {order.orderPhoneNumber}</div>
-              <div class="order-details">Email: {order.orderEmail}</div>
-              <div class="order-details">Order Date: {order.orderDate} - {order.orderDay}</div>
-              <div class="order-details">Order Time: {order.orderTime}</div>
-              <div class="order-details">Delivery Time: {order.orderDeliveryTime}</div>
-              <div class="order-details">Distance: {order.orderDistance} km</div>
-              <div class="order-details">Location: {order.orderLocation}</div>
+              <div class="order-details"><strong>Phone:</strong> {order.orderPhoneNumber}</div>
+              <div class="order-details"><strong>Email:</strong> {order.orderEmail}</div>
+              <div class="order-details"><strong>Order Date:</strong> {order.orderDate} - {order.orderDay}</div>
+              <div class="order-details"><strong>Order Time:</strong> {order.orderTime}</div>
+              <div class="order-details">
+                  <strong>Estimated Delivery Time:</strong> {calculateEstimatedDeliveryTime(order)}
+              </div>
+              <div class="order-details">
+                  <strong>Delivery Time:</strong>
+                  <input type="text" bind:value={order.orderDeliveryTime} on:blur={() => updateDeliveryTime(order.id, order.orderDeliveryTime)} />
+              </div>
+              <div class="order-details"><strong>Distance:</strong> {order.orderDistance} km</div>
+              <div class="order-details"><strong>Location:</strong> {order.orderLocation}</div>
           </div>
 
           <button class="view-location-btn" on:click={() => showLocation(order.orderLocationCoords)}>View Location</button>
@@ -134,12 +148,28 @@
               )}
           </div>
 
-          {#if order.status === "delivered"}
-              <div class="status delivered">Status: Delivered</div>
-              <button class="pending-btn" on:click={() => markAsPending(order.id)}>Mark as Pending</button>
-          {:else}
-              <button class="deliver-btn" on:click={() => markAsDelivered(order.id)}>Mark as Delivered</button>
-          {/if}
+          <div class="status-controls">
+              <label>
+                  <input type="checkbox" checked={order.status === "pending"} on:change={() => updateOrderStatus(order.id, "pending")} />
+                  Pending
+              </label>
+              <label>
+                  <input type="checkbox" checked={order.status === "packed"} on:change={() => updateOrderStatus(order.id, "packed")} />
+                  Packed
+              </label>
+              <label>
+                  <input type="checkbox" checked={order.status === "on the way"} on:change={() => updateOrderStatus(order.id, "on the way")} />
+                  On the Way
+              </label>
+              <label>
+                  <input type="checkbox" checked={order.status === "delivered"} on:change={() => updateOrderStatus(order.id, "delivered")} />
+                  Delivered
+              </label>
+          </div>
+
+          <div class="status">
+              Status: <span class={order.status === "delivered" ? "delivered" : ""}>{order.status}</span>
+          </div>
       </div>
   {/each}
 {/if}
@@ -212,78 +242,46 @@
       text-align: left;
   }
 
-  .products-table th {
-      background-color: #3498db;
-      color: white;
-      font-weight: bold;
-  }
-
   .total-value {
-      font-size: 16px;
       font-weight: bold;
-      margin-top: 12px;
+      margin-top: 10px;
       text-align: right;
-      color: #34495e;
   }
 
-  .view-location-btn {
-      background-color: #007bff;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 6px;
-      cursor: pointer;
+  .status-controls {
       margin-top: 10px;
-      transition: background 0.3s ease;
-  }
-
-  .view-location-btn:hover {
-      background-color: #0056b3;
-  }
-
-  .deliver-btn, .pending-btn {
-      background-color: #28a745;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 6px;
-      cursor: pointer;
-      margin-top: 10px;
-      transition: background 0.3s ease;
-  }
-
-  .deliver-btn:hover {
-      background-color: #218838;
-  }
-
-  .pending-btn {
-      background-color: #ffc107;
-  }
-
-  .pending-btn:hover {
-      background-color: #e0a800;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
   }
 
   .status {
       font-size: 14px;
-      margin-top: 12px;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-weight: bold;
-      text-align: center;
+      margin-top: 8px;
   }
 
   .delivered {
-      background-color: #28a745;
-      color: white;
+      color: green;
+      font-weight: bold;
   }
 
   #map {
-      height: 300px;
-      margin-top: 16px;
+      height: 400px;
+      margin-top: 20px;
   }
 
-  button:hover {
-      opacity: 0.9;
+  .view-location-btn {
+      margin-top: 10px;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+  }
+
+  .view-location-btn:hover {
+      background-color: #2980b9;
   }
 </style>
