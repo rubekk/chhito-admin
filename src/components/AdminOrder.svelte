@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { browser } from "$app/environment";
   import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
-  import { db } from "$lib/firebaseConfig"; // Import your Firebase configuration
+  import { db } from "$lib/firebaseConfig";
   import { writable } from "svelte/store";
   import "leaflet/dist/leaflet.css";
 
@@ -10,34 +10,36 @@
   let selectedLocation = null;
   let map;
   let L;
-  let currentMarker = null; // Store the current marker
+  let currentMarker = null;
 
-  // Fetch orders from Firestore
   async function fetchOrders() {
     const querySnapshot = await getDocs(collection(db, "orders"));
     let ordersArray = [];
     querySnapshot.forEach((doc) => {
       ordersArray.push({ id: doc.id, ...doc.data() });
     });
+
+    ordersArray.sort((a, b) => {
+        const dateA = new Date(`${a.orderDate.split('/').reverse().join('-')}T${a.orderTime}`);
+        const dateB = new Date(`${b.orderDate.split('/').reverse().join('-')}T${b.orderTime}`);
+        return dateB - dateA;
+    });
+
     orders.set(ordersArray);
   }
 
-  // Show location on the map
   function showLocation(coords) {
     selectedLocation = coords;
     if (map) {
       const [lat, lng] = coords;
-      // Remove the previous marker if it exists
       if (currentMarker) {
         map.removeLayer(currentMarker);
       }
-      // Add new marker to the map
       currentMarker = L.marker([lat, lng]).addTo(map).bindPopup("User Location").openPopup();
-      map.setView([lat, lng], 16); // Set the view to the user's location
+      map.setView([lat, lng], 16);
     }
   }
 
-  // Update order status
   async function updateOrderStatus(orderId, status) {
     try {
       const orderDocRef = doc(db, "orders", orderId);
@@ -52,7 +54,6 @@
     }
   }
 
-  // Update delivery time
   async function updateDeliveryTime(orderId, newTime) {
     try {
       const orderDocRef = doc(db, "orders", orderId);
@@ -67,12 +68,11 @@
     }
   }
 
-  // Calculate estimated delivery time
   function calculateEstimatedDeliveryTime(order) {
     const orderDate = new Date(`${order.orderDate} ${order.orderTime}`);
-    const deliveryDuration = parseInt(order.orderDeliveryTime) || 0; // Delivery duration in minutes
-    const estimatedDelivery = new Date(orderDate.getTime() + deliveryDuration * 60000); // Adding minutes to order time
-    return estimatedDelivery.toLocaleString(); // Format as needed
+    const deliveryDuration = parseInt(order.orderDeliveryTime) || 0;
+    const estimatedDelivery = new Date(orderDate.getTime() + deliveryDuration * 60000);
+    return estimatedDelivery.toLocaleString();
   }
 
   onMount(async () => {
@@ -82,8 +82,7 @@
 
     fetchOrders();
 
-    // Initialize the map
-    map = L.map("map").setView([27.665371, 85.331184], 2); // Default view
+    map = L.map("map").setView([27.665371, 85.331184], 2);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -133,9 +132,9 @@
                   {#each order.orderProducts as product}
                       <tr>
                           <td>{product.productName}</td>
-                          <td>{product.price}</td>
+                          <td>{product.discountedPrice}</td>
                           <td>{product.quantity}</td>
-                          <td>{product.price * product.quantity}</td>
+                          <td>{product.discountedPrice * product.quantity}</td>
                       </tr>
                   {/each}
               </tbody>
@@ -143,7 +142,7 @@
 
           <div class="total-value">
               Total Order Value: Rs. {order.orderProducts.reduce(
-                  (total, product) => total + product.price * product.quantity,
+                  (total, product) => total + product.discountedPrice * product.quantity,
                   0
               )}
           </div>
@@ -190,8 +189,8 @@
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
       padding: 16px;
       margin: 0 auto 20px;
-      width: 95%; /* Adjust width for smaller size */
-      max-width: 700px; /* Maximum width */
+      width: 95%;
+      max-width: 700px;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
       position: relative;
   }
@@ -271,14 +270,13 @@
   }
 
   .view-location-btn {
-      margin-top: 10px;
       background-color: #3498db;
       color: white;
       border: none;
-      padding: 10px 15px;
-      border-radius: 5px;
+      padding: 8px 12px;
+      border-radius: 4px;
       cursor: pointer;
-      transition: background-color 0.3s;
+      margin-bottom: 12px;
   }
 
   .view-location-btn:hover {
