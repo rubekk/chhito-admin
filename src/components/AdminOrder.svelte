@@ -77,13 +77,18 @@
   }
 
   function calculateEstimatedDeliveryTime(order) {
-    const orderDate = new Date(`${order.orderDate} ${order.orderTime}`);
-    const deliveryDuration = parseInt(order.orderDeliveryTime) || 0;
-    const estimatedDelivery = new Date(
-      orderDate.getTime() + deliveryDuration * 60000,
-    );
-    return estimatedDelivery.toLocaleString();
-  }
+        const orderDateTimeString = `${order.orderDate} ${order.orderTime}`;
+        const orderDate = new Date(orderDateTimeString);
+        const deliveryDuration = parseInt(order.orderDeliveryTime) || 0;
+        const estimatedDelivery = new Date(orderDate.getTime() + deliveryDuration * 60000);
+
+        return estimatedDelivery.toLocaleTimeString('en-US', {
+            timeZone: 'Asia/Kathmandu',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+        });
+    }
 
   onMount(async () => {
     if (browser) {
